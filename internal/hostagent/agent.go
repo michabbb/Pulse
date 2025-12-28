@@ -51,6 +51,10 @@ type Config struct {
 
 	// Disk filtering
 	DiskExclude []string // Mount points or path prefixes to exclude from disk monitoring
+
+	// Network interface filtering
+	PreferredInterface string // Report only a specific network interface (e.g., eth1)
+	PreferredIP        string // Report only a specific IP address
 }
 
 // Agent is responsible for collecting host metrics and shipping them to Pulse.
@@ -346,9 +350,32 @@ func (a *Agent) buildReport(ctx context.Context) (agentshost.Report, error) {
 	defer cancel()
 
 	uptime, _ := hostUptimeWithContext(collectCtx)
-	snapshot, err := hostmetricsCollect(collectCtx, a.cfg.DiskExclude)
+	snapshot, err := hostmetricsCollect(collectCtx, a.cfg.DiskExclude, a.cfg.PreferredInterface, a.cfg.PreferredIP)
 	if err != nil {
 		return agentshost.Report{}, fmt.Errorf("collect metrics: %w", err)
+	}
+
+	// Log network interface filtering results
+	if a.cfg.PreferredInterface != "" || a.cfg.PreferredIP != "" {
+		if len(snapshot.Network) == 0 {
+			logEvent := a.logger.Warn()
+			if a.cfg.PreferredInterface != "" {
+				logEvent = logEvent.Str("interface", a.cfg.PreferredInterface)
+			}
+			if a.cfg.PreferredIP != "" {
+				logEvent = logEvent.Str("ip", a.cfg.PreferredIP)
+			}
+			logEvent.Msg("Preferred network filter(s) not found, using default behavior")
+		} else {
+			// Log which interfaces are being reported
+			interfaceNames := make([]string, len(snapshot.Network))
+			for i, iface := range snapshot.Network {
+				interfaceNames[i] = iface.Name
+			}
+			a.logger.Info().
+				Strs("interfaces", interfaceNames).
+				Msg("Reporting filtered network interfaces")
+		}
 	}
 
 	// Collect temperature data (best effort - don't fail if unavailable)
