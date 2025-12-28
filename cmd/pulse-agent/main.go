@@ -136,6 +136,8 @@ func main() {
 			ProxmoxType:        cfg.ProxmoxType,
 			EnableCommands:     cfg.EnableCommands,
 			DiskExclude:        cfg.DiskExclude,
+			PreferredInterface: cfg.PreferredInterface,
+			PreferredIP:        cfg.PreferredIP,
 		}
 
 		agent, err := hostagent.New(hostCfg)
@@ -355,6 +357,10 @@ type Config struct {
 	// Disk filtering
 	DiskExclude []string // Mount points or patterns to exclude from disk monitoring
 
+	// Network interface filtering
+	PreferredInterface string // Report only a specific network interface (e.g., eth1)
+	PreferredIP        string // Report only a specific IP address
+
 	// Health/metrics server
 	HealthAddr string
 
@@ -395,6 +401,8 @@ func loadConfig() Config {
 	envKubeIncludeAllDeployments := utils.GetenvTrim("PULSE_KUBE_INCLUDE_ALL_DEPLOYMENTS")
 	envKubeMaxPods := utils.GetenvTrim("PULSE_KUBE_MAX_PODS")
 	envDiskExclude := utils.GetenvTrim("PULSE_DISK_EXCLUDE")
+	envPreferredInterface := utils.GetenvTrim("PULSE_PREFERRED_INTERFACE")
+	envPreferredIP := utils.GetenvTrim("PULSE_PREFERRED_IP")
 
 	// Defaults
 	defaultInterval := 30 * time.Second
@@ -462,6 +470,9 @@ func loadConfig() Config {
 	flag.Var(&kubeExcludeNamespaceFlags, "kube-exclude-namespace", "Namespace to exclude (repeatable)")
 	var diskExcludeFlags multiValue
 	flag.Var(&diskExcludeFlags, "disk-exclude", "Mount point or path prefix to exclude from disk monitoring (repeatable)")
+	preferredInterfaceFlag := flag.String("preferred-interface", envPreferredInterface, "Report only a specific network interface (e.g., eth1)")
+	preferredIPFlag := flag.String("preferred-ip", envPreferredIP, "Report only a specific IP address (e.g., 192.168.2.100)")
+
 
 	flag.Parse()
 
@@ -528,6 +539,8 @@ func loadConfig() Config {
 		KubeIncludeAllDeployments: *kubeIncludeAllDeploymentsFlag,
 		KubeMaxPods:               *kubeMaxPodsFlag,
 		DiskExclude:               diskExclude,
+		PreferredInterface:        strings.TrimSpace(*preferredInterfaceFlag),
+		PreferredIP:               strings.TrimSpace(*preferredIPFlag),
 	}
 }
 

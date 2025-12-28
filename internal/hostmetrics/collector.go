@@ -42,7 +42,8 @@ type Snapshot struct {
 
 // Collect gathers a point-in-time snapshot of host resource utilisation.
 // diskExclude contains user-defined patterns for mount points to exclude.
-func Collect(ctx context.Context, diskExclude []string) (Snapshot, error) {
+// preferredInterface and preferredIP filter network interfaces to report.
+func Collect(ctx context.Context, diskExclude []string, preferredInterface, preferredIP string) (Snapshot, error) {
 	collectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -81,7 +82,7 @@ func Collect(ctx context.Context, diskExclude []string) (Snapshot, error) {
 
 	snapshot.Disks = collectDisks(collectCtx, diskExclude)
 	snapshot.DiskIO = collectDiskIO(collectCtx)
-	snapshot.Network = collectNetwork(collectCtx)
+	snapshot.Network = collectNetwork(collectCtx, preferredInterface, preferredIP)
 
 	return snapshot, nil
 }
@@ -184,7 +185,7 @@ func collectDisks(ctx context.Context, diskExclude []string) []agentshost.Disk {
 	return disks
 }
 
-func collectNetwork(ctx context.Context) []agentshost.NetworkInterface {
+func collectNetwork(ctx context.Context, preferredInterface, preferredIP string) []agentshost.NetworkInterface {
 	ifaces, err := netInterfaces(ctx)
 	if err != nil {
 		return nil
@@ -229,6 +230,46 @@ func collectNetwork(ctx context.Context) []agentshost.NetworkInterface {
 		}
 
 		interfaces = append(interfaces, ifaceEntry)
+	}
+
+	// Apply filtering if preferences are specified
+	if preferredInterface != "" || preferredIP != "" {
+		filtered := make([]agentshost.NetworkInterface, 0)
+		
+		for _, iface := range interfaces {
+			// Filter by interface name if specified
+			if preferredInterface != "" {
+				if iface.Name != preferredInterface {
+					continue
+				}
+			}
+
+			// Filter by IP address if specified
+			if preferredIP != "" {
+				hasIP := false
+				for _, addr := range iface.Addresses {
+					ip := addr
+					if slashIdx := strings.Index(addr, "/"); slashIdx > 0 {
+						ip = addr[:slashIdx]
+					}
+					if ip == preferredIP {
+						hasIP = true
+						break
+					}
+				}
+				if !hasIP {
+					continue
+				}
+			}
+
+			filtered = append(filtered, iface)
+		}
+
+		// Only use filtered results if we found what we were looking for
+		// If filters were specified but nothing matched, fall back to all interfaces
+		if len(filtered) > 0 {
+			interfaces = filtered
+		}
 	}
 
 	sort.Slice(interfaces, func(i, j int) bool { return interfaces[i].Name < interfaces[j].Name })
