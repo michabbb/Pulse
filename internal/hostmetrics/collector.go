@@ -233,6 +233,7 @@ func collectNetwork(ctx context.Context, preferredInterface, preferredIP string)
 	}
 
 	// Apply filtering if preferences are specified
+	// If filters match nothing, fall back to reporting all interfaces (prevents silent data loss).
 	if preferredInterface != "" || preferredIP != "" {
 		filtered := make([]agentshost.NetworkInterface, 0)
 		
@@ -248,10 +249,7 @@ func collectNetwork(ctx context.Context, preferredInterface, preferredIP string)
 			if preferredIP != "" {
 				hasIP := false
 				for _, addr := range iface.Addresses {
-					ip := addr
-					if slashIdx := strings.Index(addr, "/"); slashIdx >= 0 {
-						ip = addr[:slashIdx]
-					}
+					ip := stripCIDRSuffix(addr)
 					if ip == preferredIP {
 						hasIP = true
 						break
@@ -265,8 +263,6 @@ func collectNetwork(ctx context.Context, preferredInterface, preferredIP string)
 			filtered = append(filtered, iface)
 		}
 
-		// Only use filtered results if we found what we were looking for
-		// If filters were specified but nothing matched, fall back to all interfaces
 		if len(filtered) > 0 {
 			interfaces = filtered
 		}

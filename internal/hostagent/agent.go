@@ -358,16 +358,14 @@ func (a *Agent) buildReport(ctx context.Context) (agentshost.Report, error) {
 	// Log network interface filtering results
 	if a.cfg.PreferredInterface != "" || a.cfg.PreferredIP != "" {
 		if len(snapshot.Network) == 0 {
+			logEvent := a.logger.Warn()
 			if a.cfg.PreferredInterface != "" {
-				a.logger.Warn().
-					Str("interface", a.cfg.PreferredInterface).
-					Msg("Preferred interface not found, using default behavior")
+				logEvent = logEvent.Str("interface", a.cfg.PreferredInterface)
 			}
 			if a.cfg.PreferredIP != "" {
-				a.logger.Warn().
-					Str("ip", a.cfg.PreferredIP).
-					Msg("Preferred IP not found, using default behavior")
+				logEvent = logEvent.Str("ip", a.cfg.PreferredIP)
 			}
+			logEvent.Msg("Preferred network filter(s) not found, using default behavior")
 		} else {
 			// Log which interfaces are being reported
 			interfaceNames := make([]string, len(snapshot.Network))
