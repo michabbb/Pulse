@@ -6,6 +6,16 @@ import (
 	"testing"
 )
 
+// stripCIDR removes the CIDR notation from an IP address string (e.g., "192.168.1.1/24" -> "192.168.1.1")
+func stripCIDR(addr string) string {
+	for idx := 0; idx < len(addr); idx++ {
+		if addr[idx] == '/' {
+			return addr[:idx]
+		}
+	}
+	return addr
+}
+
 // TestCollectNetwork_IntegrationReal performs an integration test with the actual system interfaces
 func TestCollectNetwork_IntegrationReal(t *testing.T) {
 	if testing.Short() {
@@ -74,15 +84,8 @@ func TestCollectNetwork_IntegrationReal(t *testing.T) {
 			t.Skip("No network interfaces with addresses available for filtering test")
 		}
 
-		// Get the first IP from the first interface
-		firstIP := snapshot.Network[0].Addresses[0]
-		// Strip CIDR notation if present
-		for idx := 0; idx < len(firstIP); idx++ {
-			if firstIP[idx] == '/' {
-				firstIP = firstIP[:idx]
-				break
-			}
-		}
+		// Get the first IP from the first interface and strip CIDR notation
+		firstIP := stripCIDR(snapshot.Network[0].Addresses[0])
 
 		filteredSnapshot, err := Collect(ctx, nil, "", firstIP)
 		if err != nil {
@@ -100,15 +103,7 @@ func TestCollectNetwork_IntegrationReal(t *testing.T) {
 		found := false
 		for _, iface := range filteredSnapshot.Network {
 			for _, addr := range iface.Addresses {
-				// Strip CIDR notation for comparison
-				addrIP := addr
-				for idx := 0; idx < len(addr); idx++ {
-					if addr[idx] == '/' {
-						addrIP = addr[:idx]
-						break
-					}
-				}
-				if addrIP == firstIP {
+				if stripCIDR(addr) == firstIP {
 					found = true
 					break
 				}

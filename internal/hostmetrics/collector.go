@@ -249,7 +249,7 @@ func collectNetwork(ctx context.Context, preferredInterface, preferredIP string)
 				hasIP := false
 				for _, addr := range iface.Addresses {
 					ip := addr
-					if slashIdx := strings.Index(addr, "/"); slashIdx > 0 {
+					if slashIdx := strings.Index(addr, "/"); slashIdx >= 0 {
 						ip = addr[:slashIdx]
 					}
 					if ip == preferredIP {
